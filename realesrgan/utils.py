@@ -45,11 +45,18 @@ class RealESRGANer():
         self.half = half
 
         # initialize model
-        if gpu_id:
-            self.device = torch.device(
-                f'cuda:{gpu_id}' if torch.cuda.is_available() else 'cpu') if device is None else device
+        if device is not None:
+            self.device = device
+        elif gpu_id:
+            self.device = torch.device(f'cuda:{gpu_id}' if torch.cuda.is_available() else 'cpu')
         else:
-            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') if device is None else device
+            # Prefer MPS on Mac, then CUDA, then CPU
+            if torch.backends.mps.is_available():
+                self.device = torch.device('mps')
+            elif torch.cuda.is_available():
+                self.device = torch.device('cuda')
+            else:
+                self.device = torch.device('cpu')
 
         if isinstance(model_path, list):
             # dni
@@ -71,6 +78,7 @@ class RealESRGANer():
 
         model.eval()
         self.model = model.to(self.device)
+        print(f"Real-ESRGAN model loaded on device: {self.device}")
         if self.half:
             self.model = self.model.half()
 

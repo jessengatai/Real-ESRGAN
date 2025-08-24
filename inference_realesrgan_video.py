@@ -269,7 +269,10 @@ def inference_video(args, video_save_path, device=None, total_workers=1, worker_
         else:
             writer.write_frame(output)
 
-        torch.cuda.synchronize(device)
+        if device and device.type == 'cuda':
+            torch.cuda.synchronize(device)
+        elif device and device.type == 'mps':
+            torch.mps.synchronize()
         pbar.update(1)
 
     reader.close()
@@ -287,8 +290,15 @@ def run(args):
         args.input = tmp_frames_folder
 
     num_gpus = torch.cuda.device_count()
+    
+    # Handle MPS on Mac - use single process
+    if torch.backends.mps.is_available() and num_gpus == 0:
+        print("Using MPS (Metal Performance Shaders) - running in single process mode")
+        inference_video(args, video_save_path, device=torch.device("mps"))
+        return
+    
     num_process = num_gpus * args.num_process_per_gpu
-    if num_process == 1:
+    if num_process <= 1:
         inference_video(args, video_save_path)
         return
 
